@@ -48,6 +48,9 @@ static void *_hybris_libgles1 = NULL;
 static void *_hybris_libgles2 = NULL;
 static int _egl_context_client_version = 1;
 
+static EGLDisplay current_display = EGL_NO_DISPLAY;
+static EGLenum    loaded_ws = EGL_NONE;
+
 static EGLint      (*_eglGetError)(void) = NULL;
 
 static EGLDisplay  (*_eglGetDisplay)(EGLNativeDisplayType display_id) = NULL;
@@ -63,6 +66,8 @@ static EGLBoolean  (*_eglDestroySurface)(EGLDisplay dpy, EGLSurface surface) = N
 
 static EGLBoolean  (*_eglSwapInterval)(EGLDisplay dpy, EGLint interval) = NULL;
 
+static EGLBoolean (*_eglMakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext context) = NULL;
+static EGLDisplay (*_eglGetCurrentDisplay)(void) = NULL;
 
 static EGLContext  (*_eglCreateContext)(EGLDisplay dpy, EGLConfig config,
 		EGLContext share_context,
@@ -158,14 +163,27 @@ void _addMapping(struct _EGLDisplay *display_id)
 	}
 }
 
-struct _EGLDisplay *hybris_egl_display_get_mapping(EGLDisplay display)
+void _removeMapping(struct _EGLDisplay *dpy)
+{
+	int i;
+	for (i = 0; i < _EGL_MAX_DISPLAYS; i++)
+	{
+		if (_displayMappings[i] == dpy)
+		{
+			_displayMappings[i] = NULL;
+			return;
+		}
+	}
+}
+
+struct _EGLDisplay *hybris_egl_display_get_mapping_for_real_display(EGLNativeDisplayType display)
 {
 	int i;
 	for (i = 0; i < _EGL_MAX_DISPLAYS; i++)
 	{
 		if (_displayMappings[i])
 		{
-			if (_displayMappings[i]->dpy == display)
+			if (_displayMappings[i]->dpy == (EGLNativeDisplayType)display)
 			{
 				return _displayMappings[i];
 			}
@@ -186,6 +204,44 @@ void hybris_egl_display_release_mappings(void)
 			_displayMappings[i] = NULL;
 		}
 	}
+}
+
+struct _EGLDisplay *hybris_egl_display_get_mapping_for_type(EGLNativeDisplayType display)
+{
+	int i;
+	for (i = 0; i < _EGL_MAX_DISPLAYS; i++)
+	{
+		if (_displayMappings[i])
+		{
+			if (_displayMappings[i]->display_id == (EGLNativeDisplayType)display)
+			{
+				return _displayMappings[i];
+			}
+
+		}
+	}
+	return EGL_NO_DISPLAY;
+}
+
+struct _EGLDisplay *hybris_egl_display_get_mapping(EGLDisplay display)
+{
+#ifdef WANT_WAYLAND
+	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR)
+		return (struct _EGLDisplay *)display;
+#endif
+
+	return hybris_egl_display_get_mapping_for_type((EGLNativeDisplayType)display);
+}
+
+EGLDisplay hybris_egl_get_real_display(EGLDisplay display)
+{
+#ifdef WANT_WAYLAND
+	/* On wayland ws, display is a pointer to an _EGLDisplay object */
+	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR)
+		return ((struct _EGLDisplay *)display)->dpy;
+#endif
+
+	return display;
 }
 
 static const char * _defaultEglPlatform()
@@ -264,6 +320,8 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 	if (ws_init(hybris_ws) == EGL_FALSE) { // Other ws already loaded.
 		__eglHybrisSetError(EGL_BAD_PARAMETER);
 		return EGL_NO_DISPLAY;
+	} else {
+		loaded_ws = _getPlatformFromString(hybris_ws);
 	}
 
 	EGLNativeDisplayType real_display;
@@ -274,16 +332,31 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 		return EGL_NO_DISPLAY;
 	}
 
-	struct _EGLDisplay *dpy = hybris_egl_display_get_mapping(real_display);
+	EGLNativeDisplayType target_display_id;
+#ifdef WANT_WAYLAND
+	/* On wayland ws, look at display_id */
+	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR)
+		target_display_id = (EGLNativeDisplayType)display_id;
+	else
+#endif
+		target_display_id = (EGLNativeDisplayType)real_display;
+
+	struct _EGLDisplay *dpy = hybris_egl_display_get_mapping_for_type(target_display_id);
 	if (!dpy) {
 		dpy = ws_GetDisplay(display_id);
 		if (!dpy) {
 			return EGL_NO_DISPLAY;
 		}
 		dpy->dpy = real_display;
+		dpy->display_id = target_display_id;
 		_addMapping(dpy);
 	}
 
+#ifdef WANT_WAYLAND
+	/* On wayland, return the dpy handle */
+	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR)
+		return (EGLDisplay)dpy;
+#endif
 	return real_display;
 }
 
@@ -306,7 +379,7 @@ EGLDisplay eglGetPlatformDisplay(EGLenum platform,
 EGLBoolean eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor)
 {
 	HYBRIS_DLSYSM(egl, &_eglInitialize, "eglInitialize");
-	EGLBoolean ret = _eglInitialize(dpy, major, minor);
+	EGLBoolean ret = _eglInitialize(hybris_egl_get_real_display(dpy), major, minor);
 	if (ret) {
 		struct _EGLDisplay *display = hybris_egl_display_get_mapping(dpy);
 		ws_eglInitialized(display);
@@ -319,8 +392,17 @@ EGLBoolean eglTerminate(EGLDisplay dpy)
 	HYBRIS_DLSYSM(egl, &_eglTerminate, "eglTerminate");
 
 	struct _EGLDisplay *display = hybris_egl_display_get_mapping(dpy);
+	EGLDisplay real_display = display->dpy;
+#ifdef WANT_WAYLAND
+	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR && current_display == dpy)
+		current_display = EGL_NO_DISPLAY;
+#endif
 	ws_Terminate(display);
-	return (*_eglTerminate)(dpy);
+	_removeMapping(display);
+
+	if (hybris_egl_display_get_mapping_for_real_display((EGLNativeDisplayType)real_display) == EGL_NO_DISPLAY) {
+		return (*_eglTerminate)(real_display);
+	}
 }
 
 const char * eglQueryString(EGLDisplay dpy, EGLint name)
@@ -339,12 +421,11 @@ const char * eglQueryString(EGLDisplay dpy, EGLint name)
 	}
 #endif
 
-	return ws_eglQueryString(dpy, name, _eglQueryString);
+	return ws_eglQueryString(hybris_egl_get_real_display(dpy), name, _eglQueryString);
 }
 
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigs, EGLDisplay, EGLConfig *, EGLint, EGLint *);
-HYBRIS_IMPLEMENT_FUNCTION5(egl, EGLBoolean, eglChooseConfig, EGLDisplay, const EGLint *, EGLConfig *, EGLint, EGLint *);
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigAttrib, EGLDisplay, EGLConfig, EGLint, EGLint *);
+HYBRIS_EGL_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigs, EGLDisplay, EGLConfig *, EGLint, EGLint *);
+HYBRIS_EGL_IMPLEMENT_FUNCTION5(egl, EGLBoolean, eglChooseConfig, EGLDisplay, const EGLint *, EGLConfig *, EGLint, EGLint *);
 
 EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config,
 		EGLNativeWindowType win,
@@ -359,7 +440,7 @@ EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config,
 	assert(((struct ANativeWindow *) win)->common.magic == ANDROID_NATIVE_WINDOW_MAGIC);
 
 	HYBRIS_TRACE_BEGIN("native-egl", "eglCreateWindowSurface", "");
-	EGLSurface result = (*_eglCreateWindowSurface)(dpy, config, win, attrib_list);
+	EGLSurface result = (*_eglCreateWindowSurface)(display->dpy, config, win, attrib_list);
 
 	HYBRIS_TRACE_END("native-egl", "eglCreateWindowSurface", "");
 
@@ -392,13 +473,13 @@ static EGLSurface _my_eglCreatePlatformWindowSurfaceEXT(EGLDisplay dpy, EGLConfi
 	return eglCreateWindowSurface(dpy, config, (uintptr_t) native_window, attrib_list);
 }
 
-HYBRIS_IMPLEMENT_FUNCTION3(egl, EGLSurface, eglCreatePbufferSurface, EGLDisplay, EGLConfig, const EGLint *);
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLSurface, eglCreatePixmapSurface, EGLDisplay, EGLConfig, EGLNativePixmapType, const EGLint *);
+HYBRIS_EGL_IMPLEMENT_FUNCTION3(egl, EGLSurface, eglCreatePbufferSurface, EGLDisplay, EGLConfig, const EGLint *);
+HYBRIS_EGL_IMPLEMENT_FUNCTION4(egl, EGLSurface, eglCreatePixmapSurface, EGLDisplay, EGLConfig, EGLNativePixmapType, const EGLint *);
 
 EGLBoolean eglDestroySurface(EGLDisplay dpy, EGLSurface surface)
 {
 	HYBRIS_DLSYSM(egl, &_eglDestroySurface, "eglDestroySurface");
-	EGLBoolean result = (*_eglDestroySurface)(dpy, surface);
+	EGLBoolean result = (*_eglDestroySurface)(hybris_egl_get_real_display(dpy), surface);
 
 	/**
          * If the surface was created via eglCreateWindowSurface, we must
@@ -411,20 +492,21 @@ EGLBoolean eglDestroySurface(EGLDisplay dpy, EGLSurface surface)
 	return result;
 }
 
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglQuerySurface, EGLDisplay, EGLSurface, EGLint, EGLint *);
+HYBRIS_EGL_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglQuerySurface, EGLDisplay, EGLSurface, EGLint, EGLint *);
 HYBRIS_IMPLEMENT_FUNCTION1(egl, EGLBoolean, eglBindAPI, EGLenum);
 HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLenum, eglQueryAPI);
 HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLBoolean, eglWaitClient);
 HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLBoolean, eglReleaseThread);
-HYBRIS_IMPLEMENT_FUNCTION5(egl, EGLSurface, eglCreatePbufferFromClientBuffer, EGLDisplay, EGLenum, EGLClientBuffer, EGLConfig, const EGLint *);
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglSurfaceAttrib, EGLDisplay, EGLSurface, EGLint, EGLint);
-HYBRIS_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglBindTexImage, EGLDisplay, EGLSurface, EGLint);
-HYBRIS_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglReleaseTexImage, EGLDisplay, EGLSurface, EGLint);
+HYBRIS_EGL_IMPLEMENT_FUNCTION5(egl, EGLSurface, eglCreatePbufferFromClientBuffer, EGLDisplay, EGLenum, EGLClientBuffer, EGLConfig, const EGLint *);
+HYBRIS_EGL_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglSurfaceAttrib, EGLDisplay, EGLSurface, EGLint, EGLint);
+HYBRIS_EGL_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglBindTexImage, EGLDisplay, EGLSurface, EGLint);
+HYBRIS_EGL_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglReleaseTexImage, EGLDisplay, EGLSurface, EGLint);
 
 EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval)
 {
 	EGLBoolean ret;
 	EGLSurface surface;
+	EGLDisplay real_display = hybris_egl_get_real_display(dpy);
 	HYBRIS_TRACE_BEGIN("hybris-egl", "eglSwapInterval", "=%d", interval);
 
 	/* Some egl implementations don't pass through the setSwapInterval
@@ -434,11 +516,11 @@ EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval)
 	HYBRIS_DLSYSM(egl, &_eglGetCurrentSurface, "eglGetCurrentSurface");
 	surface = (*_eglGetCurrentSurface)(EGL_DRAW);
 	if (egl_helper_has_mapping(surface))
-	    ws_setSwapInterval(dpy, egl_helper_get_mapping(surface), interval);
+		ws_setSwapInterval(real_display, egl_helper_get_mapping(surface), interval);
 
 	HYBRIS_TRACE_BEGIN("native-egl", "eglSwapInterval", "=%d", interval);
 	HYBRIS_DLSYSM(egl, &_eglSwapInterval, "eglSwapInterval");
-	ret = (*_eglSwapInterval)(dpy, interval);
+	ret = (*_eglSwapInterval)(real_display, interval);
 	HYBRIS_TRACE_END("native-egl", "eglSwapInterval", "");
 	HYBRIS_TRACE_END("hybris-egl", "eglSwapInterval", "");
 	return ret;
@@ -458,32 +540,59 @@ EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
 		p += 2;
 	}
 
-	return (*_eglCreateContext)(dpy, config, share_context, attrib_list);
+	return (*_eglCreateContext)(hybris_egl_get_real_display(dpy), config, share_context, attrib_list);
 }
 
-HYBRIS_IMPLEMENT_FUNCTION2(egl, EGLBoolean, eglDestroyContext, EGLDisplay, EGLContext);
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglMakeCurrent, EGLDisplay, EGLSurface, EGLSurface, EGLContext);
+HYBRIS_EGL_IMPLEMENT_FUNCTION2(egl, EGLBoolean, eglDestroyContext, EGLDisplay, EGLContext);
 HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLContext, eglGetCurrentContext);
 HYBRIS_IMPLEMENT_FUNCTION1(egl, EGLSurface, eglGetCurrentSurface, EGLint);
-HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLDisplay, eglGetCurrentDisplay);
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglQueryContext, EGLDisplay, EGLContext, EGLint, EGLint *);
+HYBRIS_EGL_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglQueryContext, EGLDisplay, EGLContext, EGLint, EGLint *);
 HYBRIS_IMPLEMENT_FUNCTION0(egl, EGLBoolean, eglWaitGL);
 HYBRIS_IMPLEMENT_FUNCTION1(egl, EGLBoolean, eglWaitNative, EGLint);
+
+EGLBoolean eglMakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext context)
+{
+	EGLBoolean ret;
+
+	HYBRIS_DLSYSM(egl, &_eglMakeCurrent, "eglMakeCurrent");
+
+	ret = (*_eglMakeCurrent)(hybris_egl_get_real_display(dpy), draw, read, context);
+
+#ifdef WANT_WAYLAND
+	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR && ret)
+		current_display = dpy;
+#endif
+
+	return ret;
+}
+
+EGLDisplay eglGetCurrentDisplay(void)
+{
+	HYBRIS_DLSYSM(egl, &_eglGetCurrentDisplay, "eglGetCurrentDisplay");
+
+#ifdef WANT_WAYLAND
+	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR)
+		return current_display;
+#endif
+
+	return (*_eglGetCurrentDisplay)();
+}
 
 EGLBoolean _my_eglSwapBuffersWithDamageEXT(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
 {
 	EGLNativeWindowType win;
 	EGLBoolean ret;
+	EGLDisplay real_display = hybris_egl_get_real_display(dpy);
 	HYBRIS_TRACE_BEGIN("hybris-egl", "eglSwapBuffersWithDamageEXT", "");
 	HYBRIS_DLSYSM(egl, &_eglSwapBuffers, "eglSwapBuffers");
 
 	if (egl_helper_has_mapping(surface)) {
 		win = egl_helper_get_mapping(surface);
-		ws_prepareSwap(dpy, win, rects, n_rects);
-		ret = (*_eglSwapBuffers)(dpy, surface);
-		ws_finishSwap(dpy, win);
+		ws_prepareSwap(real_display, win, rects, n_rects);
+		ret = (*_eglSwapBuffers)(real_display, surface);
+		ws_finishSwap(real_display, win);
 	} else {
-		ret = (*_eglSwapBuffers)(dpy, surface);
+		ret = (*_eglSwapBuffers)(real_display, surface);
 	}
 	HYBRIS_TRACE_END("hybris-egl", "eglSwapBuffersWithDamageEXT", "");
 	return ret;
@@ -498,7 +607,7 @@ EGLBoolean eglSwapBuffers(EGLDisplay dpy, EGLSurface surface)
 	return ret;
 }
 
-HYBRIS_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglCopyBuffers, EGLDisplay, EGLSurface, EGLNativePixmapType);
+HYBRIS_EGL_IMPLEMENT_FUNCTION3(egl, EGLBoolean, eglCopyBuffers, EGLDisplay, EGLSurface, EGLNativePixmapType);
 
 
 static EGLImageKHR _my_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list)
@@ -512,7 +621,7 @@ static EGLImageKHR _my_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum
 
 	ws_passthroughImageKHR(&newctx, &newtarget, &newbuffer, &newattrib_list);
 
-	EGLImageKHR eik = (*_eglCreateImageKHR)(dpy, newctx, newtarget, newbuffer, newattrib_list);
+	EGLImageKHR eik = (*_eglCreateImageKHR)(hybris_egl_get_real_display(dpy), newctx, newtarget, newbuffer, newattrib_list);
 
 	if (eik == EGL_NO_IMAGE_KHR) {
 		return EGL_NO_IMAGE_KHR;
@@ -546,7 +655,7 @@ EGLBoolean _my_eglDestroyImageKHR(EGLDisplay dpy, EGLImageKHR image)
 {
 	HYBRIS_DLSYSM(egl, &_eglDestroyImageKHR, "eglDestroyImageKHR");
 	struct egl_image *img = image;
-	EGLBoolean ret = (*_eglDestroyImageKHR)(dpy, img ? img->egl_image : NULL);
+	EGLBoolean ret = (*_eglDestroyImageKHR)(hybris_egl_get_real_display(dpy), img ? img->egl_image : NULL);
 	if (ret == EGL_TRUE) {
 		free(img);
 		return EGL_TRUE;
@@ -689,4 +798,5 @@ __eglMustCastToProperFunctionPointerType eglGetProcAddress(const char *procname)
 	return ret;
 }
 
+HYBRIS_EGL_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigAttrib, EGLDisplay, EGLConfig, EGLint, EGLint *);
 // vim:ts=4:sw=4:noexpandtab
