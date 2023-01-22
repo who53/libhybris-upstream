@@ -691,6 +691,23 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_SAMENAME(eglCreateContext),
 	OVERRIDE_SAMENAME(eglSwapBuffers),
 	OVERRIDE_SAMENAME(eglGetProcAddress),
+	OVERRIDE_SAMENAME(eglInitialize),
+	OVERRIDE_SAMENAME(eglGetConfigs),
+	OVERRIDE_SAMENAME(eglChooseConfig),
+	OVERRIDE_SAMENAME(eglCreatePbufferSurface),
+	OVERRIDE_SAMENAME(eglCreatePixmapSurface),
+	OVERRIDE_SAMENAME(eglQuerySurface),
+	OVERRIDE_SAMENAME(eglCreatePbufferFromClientBuffer),
+	OVERRIDE_SAMENAME(eglSurfaceAttrib),
+	OVERRIDE_SAMENAME(eglBindTexImage),
+	OVERRIDE_SAMENAME(eglReleaseTexImage),
+	OVERRIDE_SAMENAME(eglDestroyContext),
+	OVERRIDE_SAMENAME(eglMakeCurrent),
+	OVERRIDE_SAMENAME(eglGetCurrentDisplay),
+	OVERRIDE_SAMENAME(eglQueryContext),
+	OVERRIDE_SAMENAME(eglCopyBuffers),
+	OVERRIDE_SAMENAME(eglQueryString),
+	OVERRIDE_SAMENAME(eglSetDamageRegionKHR),
 	/*
 	 * EGL_EXT_platform_base, in case Android EGL or glvnd advertise its
 	 * support.
@@ -723,7 +740,7 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 };
 static EGLBoolean _eglHybrisOverrideFunctions_sorted = EGL_FALSE;
 
-#undef OVERRIDE_SANENAME
+#undef OVERRIDE_SAMENAME
 #undef OVERRIDE_MY
 #undef OVERRIDE_TO
 
