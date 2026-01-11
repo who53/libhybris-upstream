@@ -430,6 +430,44 @@ EGLBoolean eglSwapInterval(EGLDisplay dpy, EGLint interval)
 	return ret;
 }
 
+static EGLConfig hybris_egl_choose_best_config(EGLDisplay dpy, EGLint client_version)
+{
+    EGLConfig config;
+    EGLint num_configs;
+    EGLint cfg_attribs[16];
+    int i = 0;
+
+    cfg_attribs[i++] = EGL_SURFACE_TYPE;
+    cfg_attribs[i++] = EGL_WINDOW_BIT;
+
+    cfg_attribs[i++] = EGL_RENDERABLE_TYPE;
+    if (client_version == 1) {
+        cfg_attribs[i++] = EGL_OPENGL_ES_BIT;
+    } else if (client_version == 2) {
+        cfg_attribs[i++] = EGL_OPENGL_ES2_BIT;
+    } else if (client_version >= 3) {
+        cfg_attribs[i++] = EGL_OPENGL_ES3_BIT_KHR;
+    } else {
+        cfg_attribs[i++] = EGL_OPENGL_ES2_BIT;
+    }
+
+    cfg_attribs[i++] = EGL_RED_SIZE;
+    cfg_attribs[i++] = 8;
+    cfg_attribs[i++] = EGL_GREEN_SIZE;
+    cfg_attribs[i++] = 8;
+    cfg_attribs[i++] = EGL_BLUE_SIZE;
+    cfg_attribs[i++] = 8;
+    cfg_attribs[i++] = EGL_ALPHA_SIZE;
+    cfg_attribs[i++] = 8;
+    cfg_attribs[i++] = EGL_NONE;
+
+    if (eglChooseConfig(dpy, cfg_attribs, &config, 1, &num_configs) == EGL_TRUE && num_configs > 0) {
+        return config;
+    }
+
+    return EGL_NO_CONFIG_KHR;
+}
+
 EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
 		EGLContext share_context,
 		const EGLint *attrib_list)
@@ -444,7 +482,13 @@ EGLContext eglCreateContext(EGLDisplay dpy, EGLConfig config,
 		p += 2;
 	}
 
-	return (*_eglCreateContext)(dpy, config, share_context, attrib_list);
+	EGLContext ctx = (*_eglCreateContext)(dpy, config, share_context, attrib_list);
+
+	if (ctx == EGL_NO_CONTEXT && config == EGL_NO_CONFIG_KHR) {
+        ctx = (*_eglCreateContext)(dpy, hybris_egl_choose_best_config(dpy, _egl_context_client_version), share_context, attrib_list);
+    }
+
+	return ctx;
 }
 
 HYBRIS_IMPLEMENT_FUNCTION2(egl, EGLBoolean, eglDestroyContext, EGLDisplay, EGLContext);
