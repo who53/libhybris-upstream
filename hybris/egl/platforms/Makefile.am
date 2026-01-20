@@ -11,4 +11,6 @@ if WANT_WAYLAND
 SUBDIRS += wayland
 endif
 
-
+if WANT_MEMBRANE
+SUBDIRS += membrane
+endif

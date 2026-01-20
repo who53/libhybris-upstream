@@ -242,6 +242,12 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 			break;
 #endif
 
+#ifdef WANT_MEMBRANE
+		case EGL_PLATFORM_WAYLAND_KHR:
+			hybris_ws = "membrane";
+			break;
+#endif
+
 		default:
 			__eglHybrisSetError(EGL_BAD_PARAMETER);
 			return EGL_NO_DISPLAY;
@@ -313,7 +319,7 @@ const char * eglQueryString(EGLDisplay dpy, EGLint name)
 {
 	HYBRIS_DLSYSM(egl, &_eglQueryString, "eglQueryString");
 
-#ifdef WANT_WAYLAND
+#if defined(WANT_WAYLAND) || defined(WANT_MEMBRANE)
 	if (dpy == EGL_NO_DISPLAY && name == EGL_EXTENSIONS) {
 		const char *ret = _eglQueryString(dpy, name);
 		static char eglextensionsbuf[2048];

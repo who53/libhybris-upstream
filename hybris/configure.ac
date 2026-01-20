@@ -93,6 +93,21 @@ AC_ARG_ENABLE(wayland,
   [wayland="no"])
 AM_CONDITIONAL( [WANT_WAYLAND], [test x"$wayland" = x"yes"])
 
+AC_ARG_ENABLE(membrane,
+  [  --enable-membrane            Enable membrane support (default=disabled)],
+  [membrane=$enableval
+	PKG_CHECK_MODULES(LIBDRM, libdrm,, exit)
+	PKG_CHECK_MODULES(WAYLAND_CLIENT, wayland-client,, exit)
+	PKG_CHECK_MODULES(WAYLAND_SERVER, wayland-server,, exit)
+	PKG_CHECK_MODULES(WAYLAND_EGL, [wayland-egl >= 1.15],, exit)
+	WAYLAND_PREFIX=`$PKG_CONFIG --variable=prefix wayland-client`
+
+	AC_PATH_PROG([WAYLAND_SCANNER], [wayland-scanner],, [${WAYLAND_PREFIX}/bin$PATH_SEPARATOR$PATH])
+	AC_DEFINE(WANT_MEMBRANE, [], [We want Membrane support])
+],
+  [membrane="no"])
+AM_CONDITIONAL( [WANT_MEMBRANE], [test x"$membrane" = x"yes"])
+
 AC_ARG_ENABLE(glvnd,
   [  --enable-glvnd                                 Enable GLVND support])
 AM_CONDITIONAL( [WANT_GLVND], [test "$enable_glvnd" = "yes"])
@@ -316,6 +331,7 @@ AC_CONFIG_FILES([
 	egl/platforms/null/Makefile
 	egl/platforms/fbdev/Makefile
 	egl/platforms/wayland/Makefile
+	egl/platforms/membrane/Makefile
 	egl/platforms/hwcomposer/Makefile
 	egl/platforms/hwcomposer/hwcomposer-egl.pc
 	glesv1/glesv1_cm.pc

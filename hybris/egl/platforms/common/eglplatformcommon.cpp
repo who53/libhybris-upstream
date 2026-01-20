@@ -41,6 +41,10 @@
 
 #include <hybris/gralloc/gralloc.h>
 
+#include <algorithm>
+#include <vector>
+#include <utility>
+
 static struct ws_egl_interface *my_egl_interface;
 
 extern "C" void eglplatformcommon_init(struct ws_egl_interface *egl_iface)
@@ -267,6 +271,62 @@ eglplatformcommon_passthroughImageKHR(EGLContext *ctx, EGLenum *target, EGLClien
 		*ctx = EGL_NO_CONTEXT;
 		*attrib_list = NULL;
 	}
+#endif
+
+#ifdef WANT_MEMBRANE
+	if (*attrib_list) {
+   	   int width = 0, height = 0, stride = 0;
+   	   int usage = GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER;
+   	   std::vector<std::pair<int, int>> plane_fds;
+
+   	   for (const EGLint *attr = *attrib_list; attr && attr[0] != EGL_NONE; attr += 2) {
+   	      switch (attr[0]) {
+   	         case EGL_WIDTH: width = attr[1]; break;
+   	         case EGL_HEIGHT: height = attr[1]; break;
+   	         case EGL_DMA_BUF_PLANE0_PITCH_EXT: stride = attr[1]; break;
+   	         case EGL_DMA_BUF_PLANE0_FD_EXT: plane_fds.push_back({0, attr[1]}); break;
+   	         case EGL_DMA_BUF_PLANE1_FD_EXT: plane_fds.push_back({1, attr[1]}); break;
+   	         case EGL_DMA_BUF_PLANE2_FD_EXT: plane_fds.push_back({2, attr[1]}); break;
+   	         case EGL_DMA_BUF_PLANE3_FD_EXT: plane_fds.push_back({3, attr[1]}); break;
+   	      }
+   	   }
+
+   	   std::sort(plane_fds.begin(), plane_fds.end());
+
+   	   if (!plane_fds.empty()) {
+   	      int meta_fd = plane_fds.back().second;
+   	      plane_fds.pop_back();
+
+   	      struct stat sb;
+   	      if (fstat(meta_fd, &sb) == 0 && sb.st_size > 0) {
+   	         int num_ints = sb.st_size / sizeof(int);
+   	         int num_fds = plane_fds.size();
+   	         std::vector<int> ints(num_ints);
+
+   	         lseek(meta_fd, 0, SEEK_SET);
+   	         read(meta_fd, ints.data(), num_ints * sizeof(int));
+
+   	         native_handle_t *nh = native_handle_create(num_fds, num_ints);
+   	         for (int i = 0; i < num_fds; i++) nh->data[i] = plane_fds[i].second;
+   	         for (int i = 0; i < num_ints; i++) nh->data[num_fds + i] = ints[i];
+
+   	         buffer_handle_t handle = nullptr;
+   	         hybris_gralloc_import_buffer(nh, &handle);
+   	         native_handle_delete(nh);
+
+   	         if (handle) {
+   	            RemoteWindowBuffer *anwb = new RemoteWindowBuffer(width, height, stride / 4, HAL_PIXEL_FORMAT_RGBA_8888, usage, handle);
+   	            anwb->common.incRef(&anwb->common);
+   	            anwb->setAllocated(true);
+
+   	            *buffer = (EGLClientBuffer)static_cast<ANativeWindowBuffer*>(anwb);
+   	            *target = EGL_NATIVE_BUFFER_ANDROID;
+   	            *ctx = EGL_NO_CONTEXT;
+   	            *attrib_list = nullptr;
+   	         }
+   	      }
+   	   }
+   	}
 #endif
 }
 
