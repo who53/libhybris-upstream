@@ -78,7 +78,17 @@ __eglGLVNDQueryString(EGLDisplay dpy, EGLenum name)
 {
     if (dpy == EGL_NO_DISPLAY && name == EGL_EXTENSIONS) {
         // Rely on C++11's static initialization guarantee.
+#if defined(WANT_MEMBRANE)
+        static const std::string clientExts = []() {
+            std::string exts = clientExtensionNoPlatform();
+            if (!exts.empty()) {
+                exts += " EGL_EXT_platform_base EGL_KHR_platform_gbm";
+            }
+            return exts;
+        }();
+#else
         static const std::string clientExts = clientExtensionNoPlatform();
+#endif
 
         // We can do this because if Android's EGL support client
         // extensions, it will at least have EGL_EXT_client_extensions.

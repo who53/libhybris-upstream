@@ -241,6 +241,9 @@ EGLDisplay hybris_egl_get_real_display(EGLDisplay display)
 		return ((struct _EGLDisplay *)display)->dpy;
 #endif
 
+	if (loaded_ws == EGL_PLATFORM_GBM_KHR)
+		return ((struct _EGLDisplay *)display)->dpy;
+
 	return display;
 }
 
@@ -306,6 +309,10 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 			hybris_ws = "null";
 			break;
 
+		case EGL_PLATFORM_GBM_KHR:
+			hybris_ws = "hwcomposer";
+			break;
+
 #ifdef WANT_WAYLAND
 		case EGL_PLATFORM_WAYLAND_KHR:
 			hybris_ws = "wayland";
@@ -343,7 +350,11 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 
 	struct _EGLDisplay *dpy = hybris_egl_display_get_mapping_for_type(target_display_id);
 	if (!dpy) {
-		dpy = ws_GetDisplay(display_id);
+		if (platform == EGL_PLATFORM_GBM_KHR) {
+			dpy = ws_GetDisplay(EGL_DEFAULT_DISPLAY);
+		} else {
+			dpy = ws_GetDisplay(display_id);
+		}
 		if (!dpy) {
 			return EGL_NO_DISPLAY;
 		}
@@ -357,6 +368,8 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 	if (loaded_ws == EGL_PLATFORM_WAYLAND_KHR)
 		return (EGLDisplay)dpy;
 #endif
+	if (loaded_ws == EGL_PLATFORM_GBM_KHR)
+		return (EGLDisplay)dpy;
 	return real_display;
 }
 
