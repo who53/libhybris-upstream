@@ -25,6 +25,7 @@
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <hybris/common/binding.h>
 
@@ -104,7 +105,6 @@ HYBRIS_IMPLEMENT_VOID_FUNCTION3(glesv2, glGetShaderiv, GLuint, GLenum, GLint *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION4(glesv2, glGetShaderInfoLog, GLuint, GLsizei, GLsizei *, GLchar *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION4(glesv2, glGetShaderPrecisionFormat, GLenum, GLenum, GLint *, GLint *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION4(glesv2, glGetShaderSource, GLuint, GLsizei, GLsizei *, GLchar *);
-HYBRIS_IMPLEMENT_FUNCTION1(glesv2, const GLubyte *, glGetString, GLenum);
 HYBRIS_IMPLEMENT_VOID_FUNCTION3(glesv2, glGetTexParameterfv, GLenum, GLenum, GLfloat *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION3(glesv2, glGetTexParameteriv, GLenum, GLenum, GLint *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION3(glesv2, glGetUniformfv, GLuint, GLint, GLfloat *);
@@ -235,7 +235,6 @@ HYBRIS_IMPLEMENT_VOID_FUNCTION3(glesv2, glClearBufferiv, GLenum, GLint, const GL
 HYBRIS_IMPLEMENT_VOID_FUNCTION3(glesv2, glClearBufferuiv, GLenum, GLint, const GLuint *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION3(glesv2, glClearBufferfv, GLenum, GLint, const GLfloat *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION4(glesv2, glClearBufferfi, GLenum, GLint, GLfloat, GLint);
-HYBRIS_IMPLEMENT_FUNCTION2(glesv2, const GLubyte *, glGetStringi, GLenum, GLuint);
 HYBRIS_IMPLEMENT_VOID_FUNCTION5(glesv2, glCopyBufferSubData, GLenum, GLenum, GLintptr, GLintptr, GLsizeiptr);
 HYBRIS_IMPLEMENT_VOID_FUNCTION4(glesv2, glGetUniformIndices, GLuint, GLsizei, const GLchar *const *, GLuint *);
 HYBRIS_IMPLEMENT_VOID_FUNCTION5(glesv2, glGetActiveUniformsiv, GLuint, GLsizei, const GLuint *, GLenum, GLint *);
@@ -282,6 +281,8 @@ HYBRIS_IMPLEMENT_VOID_FUNCTION5(glesv2, glGetInternalformativ, GLenum, GLenum, G
 
 static void         (*_glEGLImageTargetTexture2DOES) (GLenum target, GLeglImageOES image) = NULL;
 static void         (*_glEGLImageTargetRenderbufferStorageOES) (GLenum target, GLeglImageOES image) = NULL;
+static const GLubyte *(*_glGetString)(GLenum name) = NULL;
+static const GLubyte *(*_glGetStringi)(GLenum name, GLuint index) = NULL;
 
 void glEGLImageTargetTexture2DOES (GLenum target, GLeglImageOES image)
 {
@@ -295,6 +296,38 @@ void glEGLImageTargetRenderbufferStorageOES (GLenum target, GLeglImageOES image)
        HYBRIS_DLSYSM(glesv2, &_glEGLImageTargetRenderbufferStorageOES, "glEGLImageTargetRenderbufferStorageOES");
        struct egl_image *img = image;
        (*_glEGLImageTargetRenderbufferStorageOES)(target, img ? img->egl_image : NULL);
+}
+
+const GLubyte *glGetString(GLenum name)
+{
+	HYBRIS_DLSYSM(glesv2, &_glGetString, "glGetString");
+
+	if (name != GL_EXTENSIONS)
+		return _glGetString(name);
+
+	static char *exts;
+	if (!exts) {
+		const char *orig = (const char *)_glGetString(GL_EXTENSIONS);
+		asprintf(&exts, "%s GL_EXT_unpack_subimage", orig);
+	}
+
+	return (const GLubyte *)exts;
+}
+
+const GLubyte *glGetStringi(GLenum name, GLuint index)
+{
+	HYBRIS_DLSYSM(glesv2, &_glGetStringi, "glGetStringi");
+
+	if (name != GL_EXTENSIONS)
+		return _glGetStringi(name, index);
+
+	GLint n;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &n);
+
+	if ((GLint)index == n)
+		return (const GLubyte *)"GL_EXT_unpack_subimage";
+
+	return _glGetStringi(name, index);
 }
 
 /* GLES 3.1 */
