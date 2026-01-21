@@ -76,7 +76,8 @@ endif
 platformcommondir = $(includedir)/hybris/platformcommon
 platformcommon_HEADERS = \
 	support.h \
-	nativewindowbase.h
+	nativewindowbase.h \
+	windowbuffer.h
 
 if WANT_WAYLAND
 libhybris_platformcommon_la_LDFLAGS += \
