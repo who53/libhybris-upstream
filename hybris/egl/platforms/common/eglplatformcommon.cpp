@@ -348,7 +348,7 @@ extern "C" const char *eglplatformcommon_eglQueryString(EGLDisplay dpy, EGLint n
 	{
 		static char eglextensionsbuf[2048];
 		snprintf(eglextensionsbuf, 2046, "%s %s", ret,
-			"EGL_KHR_no_config_context"
+			"EGL_KHR_no_config_context EGL_EXT_image_dma_buf_import EGL_EXT_image_dma_buf_import_modifiers"
 		);
 		ret = eglextensionsbuf;
 	}

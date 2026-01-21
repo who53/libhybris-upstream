@@ -708,6 +708,44 @@ EGLBoolean _my_eglDestroyImageKHR(EGLDisplay dpy, EGLImageKHR image)
 	return ret;
 }
 
+static EGLBoolean
+_my_eglQueryDmaBufModifiersEXT(EGLDisplay dpy, EGLint format,
+                              EGLint max_modifiers,
+                              EGLuint64KHR *modifiers,
+                              EGLBoolean *external_only,
+                              EGLint *num_modifiers)
+{
+	(void)dpy;
+
+	if (format != 0x34325258) // DRM_FORMAT_XRGB8888
+		return EGL_FALSE;
+
+	if (num_modifiers)
+		*num_modifiers = 1;
+	if (max_modifiers > 0 && modifiers)
+		modifiers[0] = 0; // DRM_FORMAT_MOD_LINEAR
+	if (max_modifiers > 0 && external_only)
+		external_only[0] = EGL_FALSE;
+
+	return EGL_TRUE;
+}
+
+static EGLBoolean
+_my_eglQueryDmaBufFormatsEXT(EGLDisplay dpy, EGLint max_formats,
+                            EGLint *formats, EGLint *num_formats)
+{
+	(void)dpy;
+
+	if (!num_formats)
+		return EGL_FALSE;
+
+	*num_formats = 1;
+	if (max_formats > 0 && formats)
+		formats[0] = 0x34325258; // DRM_FORMAT_XRGB8888
+
+	return EGL_TRUE;
+}
+
 struct FuncNamePair {
 	const char * name;
 	__eglMustCastToProperFunctionPointerType func;
@@ -724,6 +762,8 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_MY(glEGLImageTargetTexture2DOES),
 	OVERRIDE_MY(glEGLImageTargetRenderbufferStorageOES),
 	OVERRIDE_MY(eglDestroyImageKHR),
+	OVERRIDE_MY(eglQueryDmaBufFormatsEXT),
+	OVERRIDE_MY(eglQueryDmaBufModifiersEXT),
 	OVERRIDE_SAMENAME(eglGetError),
 	OVERRIDE_SAMENAME(eglGetDisplay),
 	OVERRIDE_SAMENAME(eglGetPlatformDisplay),
