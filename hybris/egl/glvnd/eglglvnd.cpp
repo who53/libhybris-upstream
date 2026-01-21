@@ -101,6 +101,9 @@ __eglGLVNDGetVendorString(int name)
 #if defined(WANT_WAYLAND) || defined(WANT_MEMBRANE)
             " EGL_EXT_platform_wayland EGL_KHR_platform_wayland"
 #endif
+#ifdef WANT_MEMBRANE
+            " EGL_EXT_platform_base EGL_KHR_platform_gbm"
+#endif
             ;
     }
 

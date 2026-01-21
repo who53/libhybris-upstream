@@ -243,6 +243,7 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 #endif
 
 #ifdef WANT_MEMBRANE
+		case EGL_PLATFORM_GBM_KHR:
 		case EGL_PLATFORM_WAYLAND_KHR:
 			hybris_ws = "membrane";
 			break;

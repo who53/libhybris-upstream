@@ -257,15 +257,19 @@ public:
 
 			wl_surface_attach(m_wl_surface, mnb->getWlBuffer(), 0, 0);
 
-			if (m_damage_n_rects > 0 && m_damage_rects) {
-				int h = m_wl_window->height;
-				for (int i = 0; i < m_damage_n_rects; i++) {
-					const int *rect = &m_damage_rects[i * 4];
-					wl_surface_damage_buffer(m_wl_surface, rect[0], h - rect[1] - rect[3],
-							  rect[2], rect[3]);
+			if (wl_proxy_get_version((struct wl_proxy *) m_wl_surface) >= WL_SURFACE_DAMAGE_BUFFER_SINCE_VERSION) {
+				if (m_damage_n_rects > 0 && m_damage_rects) {
+					int h = m_wl_window->height;
+					for (int i = 0; i < m_damage_n_rects; i++) {
+						const int *rect = &m_damage_rects[i * 4];
+						wl_surface_damage_buffer(m_wl_surface, rect[0], h - rect[1] - rect[3],
+								  rect[2], rect[3]);
+					}
+				} else {
+					wl_surface_damage_buffer(m_wl_surface, 0, 0, INT32_MAX, INT32_MAX);
 				}
 			} else {
-				wl_surface_damage_buffer(m_wl_surface, 0, 0, INT32_MAX, INT32_MAX);
+				wl_surface_damage(m_wl_surface, 0, 0, INT32_MAX, INT32_MAX);
 			}
 			m_damage_rects = NULL;
 			m_damage_n_rects = 0;
@@ -527,13 +531,14 @@ membranews_CreateWindow(EGLNativeWindowType win, struct _EGLDisplay *display) {
 
 	MembraneNativeWindow *w =
 		new MembraneNativeWindow(wl_win, dpy->wl_dpy, dpy->dmabuf);
+	w->common.incRef(&w->common);
 	return (EGLNativeWindowType) static_cast<ANativeWindow *>(w);
 }
 
 extern "C" void membranews_DestroyWindow(EGLNativeWindowType win) {
 	MembraneNativeWindow *w =
 		static_cast<MembraneNativeWindow *>((struct ANativeWindow *)win);
-	delete w;
+	w->common.decRef(&w->common);
 }
 
 extern "C" void membranews_releaseDisplay(struct _EGLDisplay *dpy) {
