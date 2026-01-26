@@ -21,6 +21,7 @@
 #include <EGL/egl.h>
 
 void eglplatformcommon_init(struct ws_egl_interface *egl_iface);
+EGLDisplay eglplatformcommon_eglGetCurrentDisplay(void);
 __eglMustCastToProperFunctionPointerType eglplatformcommon_eglGetProcAddress(const char *procname);
 void eglplatformcommon_passthroughImageKHR(EGLContext *ctx, EGLenum *target, EGLClientBuffer *buffer, const EGLint **attrib_list);
 const char *eglplatformcommon_eglQueryString(EGLDisplay dpy, EGLint name, const char *(*real_eglQueryString)(EGLDisplay dpy, EGLint name));

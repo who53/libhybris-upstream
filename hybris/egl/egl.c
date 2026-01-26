@@ -109,6 +109,7 @@ struct ws_egl_interface hybris_egl_interface = {
 	_android_egl_dlsym,
 	egl_helper_has_mapping,
 	egl_helper_get_mapping,
+	eglGetCurrentDisplay,
 };
 
 static __thread EGLint __eglHybrisError = EGL_SUCCESS;

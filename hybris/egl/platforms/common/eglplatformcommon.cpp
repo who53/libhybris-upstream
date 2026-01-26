@@ -48,6 +48,11 @@ extern "C" void eglplatformcommon_init(struct ws_egl_interface *egl_iface)
 	my_egl_interface = egl_iface;
 }
 
+extern "C" EGLDisplay eglplatformcommon_eglGetCurrentDisplay(void)
+{
+	return my_egl_interface->eglGetCurrentDisplay();
+}
+
 extern "C" void *hybris_android_egl_dlsym(const char *symbol)
 {
 	return (*my_egl_interface->android_egl_dlsym)(symbol);

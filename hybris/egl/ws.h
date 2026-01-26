@@ -25,6 +25,7 @@ struct ws_egl_interface {
 
 	int (*has_mapping)(EGLSurface surface);
 	EGLNativeWindowType (*get_mapping)(EGLSurface surface);
+	EGLDisplay (*eglGetCurrentDisplay)(void);
 };
 
 /* Defined in egl.c */
