@@ -337,7 +337,20 @@ const char * eglQueryString(EGLDisplay dpy, EGLint name)
 
 HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigs, EGLDisplay, EGLConfig *, EGLint, EGLint *);
 HYBRIS_IMPLEMENT_FUNCTION5(egl, EGLBoolean, eglChooseConfig, EGLDisplay, const EGLint *, EGLConfig *, EGLint, EGLint *);
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigAttrib, EGLDisplay, EGLConfig, EGLint, EGLint *);
+
+static EGLBoolean (*_eglGetConfigAttrib)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value) = NULL;
+EGLBoolean eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value)
+{
+	HYBRIS_DLSYSM(egl, &_eglGetConfigAttrib, "eglGetConfigAttrib");
+
+	EGLBoolean ret = _eglGetConfigAttrib(dpy, config, attribute, value);
+
+	if (ret && attribute == EGL_NATIVE_VISUAL_ID) {
+			*value = 0x34325258; // DRM_FORMAT_XRGB8888
+	}
+
+	return ret;
+}
 
 EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config,
 		EGLNativeWindowType win,
@@ -663,6 +676,7 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_SAMENAME(eglInitialize),
 	OVERRIDE_SAMENAME(eglGetConfigs),
 	OVERRIDE_SAMENAME(eglChooseConfig),
+	OVERRIDE_SAMENAME(eglGetConfigAttrib),
 	OVERRIDE_SAMENAME(eglCreatePbufferSurface),
 	OVERRIDE_SAMENAME(eglCreatePixmapSurface),
 	OVERRIDE_SAMENAME(eglQuerySurface),
