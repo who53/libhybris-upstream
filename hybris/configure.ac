@@ -93,6 +93,14 @@ AC_ARG_ENABLE(wayland,
   [wayland="no"])
 AM_CONDITIONAL( [WANT_WAYLAND], [test x"$wayland" = x"yes"])
 
+AC_ARG_ENABLE(membrane,
+  [  --enable-membrane            Enable membrane support (default=disabled)],
+  [membrane=$enableval
+	AC_DEFINE(WANT_MEMBRANE, [], [We want Membrane support])
+],
+  [membrane="no"])
+AM_CONDITIONAL( [WANT_MEMBRANE], [test x"$membrane" = x"yes"])
+
 AC_ARG_ENABLE(glvnd,
   [  --enable-glvnd                                 Enable GLVND support])
 AM_CONDITIONAL( [WANT_GLVND], [test "$enable_glvnd" = "yes"])

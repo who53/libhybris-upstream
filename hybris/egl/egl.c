@@ -241,6 +241,14 @@ EGLDisplay __eglHybrisGetPlatformDisplayCommon(EGLenum platform,
 			break;
 #endif
 
+#ifdef WANT_MEMBRANE
+		case EGL_PLATFORM_GBM_KHR:
+		case EGL_PLATFORM_DEVICE_EXT:
+		case EGL_PLATFORM_WAYLAND_KHR:
+			hybris_ws = "membrane";
+			break;
+#endif
+
 		default:
 			__eglHybrisSetError(EGL_BAD_PARAMETER);
 			return EGL_NO_DISPLAY;
@@ -632,6 +640,7 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_MY(glEGLImageTargetTexture2DOES),
 	OVERRIDE_MY(glEGLImageTargetRenderbufferStorageOES),
 	OVERRIDE_MY(eglDestroyImageKHR),
+	OVERRIDE_MY(eglGetConfigAttrib),
 	OVERRIDE_MY(eglQueryDmaBufFormatsEXT),
 	OVERRIDE_MY(eglQueryDmaBufModifiersEXT),
 	OVERRIDE_SAMENAME(eglGetError),
