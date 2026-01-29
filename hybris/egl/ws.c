@@ -202,4 +202,18 @@ void ws_setSwapInterval(EGLDisplay dpy, EGLNativeWindowType win, EGLint interval
 		ws->setSwapInterval(dpy, win, interval);
 }
 
+EGLBoolean ws_QueryDmaBufModifiersEXT(EGLDisplay dpy, EGLint format, EGLint max_modifiers, EGLuint64KHR *modifiers, EGLBoolean *external_only, EGLint *num_modifiers)
+{
+	if (ws == NULL || !ws->eglQueryDmaBufModifiersEXT)
+		return EGL_FALSE;
+	return ws->eglQueryDmaBufModifiersEXT(dpy, format, max_modifiers, modifiers, external_only, num_modifiers);
+}
+
+EGLBoolean ws_QueryDmaBufFormatsEXT(EGLDisplay dpy, EGLint max_formats, EGLint *formats, EGLint *num_formats)
+{
+	if (ws == NULL || !ws->eglQueryDmaBufFormatsEXT)
+		return EGL_FALSE;
+	return ws->eglQueryDmaBufFormatsEXT(dpy, max_formats, formats, num_formats);
+}
+
 // vim:ts=4:sw=4:noexpandtab
