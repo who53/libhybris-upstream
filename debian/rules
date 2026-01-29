@@ -42,7 +42,7 @@ alt_ld_so_conf_path     := $(ld_so_conf_dir)/$(alt_ld_so_conf_file)
 
 ANDROID_HEADERS_PATH = /usr/include/android
 DEFAULT_CONFIGURATION = \
-	--enable-wayland \
+	--enable-membrane \
 	--with-android-headers=$(ANDROID_HEADERS_PATH) \
 	--enable-property-cache \
 	--enable-experimental \
