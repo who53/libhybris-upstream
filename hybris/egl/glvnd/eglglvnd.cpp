@@ -102,7 +102,7 @@ __eglGLVNDGetVendorString(int name)
             " EGL_EXT_platform_wayland EGL_KHR_platform_wayland"
 #endif
 #ifdef WANT_MEMBRANE
-            " EGL_EXT_platform_base EGL_KHR_platform_gbm EGL_EXT_platform_device"
+            " EGL_EXT_platform_base EGL_EXT_device_base EGL_KHR_platform_gbm EGL_EXT_platform_device"
 #endif
             ;
     }

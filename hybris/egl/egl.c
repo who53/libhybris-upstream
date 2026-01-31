@@ -624,6 +624,47 @@ _my_eglQueryDmaBufFormatsEXT(EGLDisplay dpy, EGLint max_formats,
 	return ws_QueryDmaBufFormatsEXT(dpy, max_formats, formats, num_formats);
 }
 
+#ifdef WANT_MEMBRANE
+static EGLBoolean _my_eglQueryDisplayAttribEXT(EGLDisplay dpy, EGLint attribute, EGLAttrib *value)
+{
+	(void)dpy;
+
+	if (attribute == EGL_DEVICE_EXT) {
+		if (value)
+			*value = (EGLAttrib)(uintptr_t)0xABBAABBA;
+		return EGL_TRUE;
+	}
+
+	return EGL_FALSE;
+}
+
+static EGLBoolean _my_eglQueryDevicesEXT(EGLint max_devices, EGLDeviceEXT *devices, EGLint *num_devices)
+{
+       if (!num_devices)
+               return EGL_FALSE;
+
+       *num_devices = 1;
+
+       if (max_devices > 0 && devices)
+               devices[0] = (EGLDeviceEXT)(uintptr_t)0xABBAABBA;
+
+       return EGL_TRUE;
+}
+
+static const char * _my_eglQueryDeviceStringEXT(EGLDeviceEXT device, EGLint name)
+{
+       (void)device;
+
+       if (name == EGL_DRM_DEVICE_FILE_EXT)
+               return "/dev/dri/by-path/platform-membrane-card";
+
+       if (name == EGL_EXTENSIONS)
+               return "EGL_EXT_device_drm";
+
+       return NULL;
+}
+#endif
+
 struct FuncNamePair {
 	const char * name;
 	__eglMustCastToProperFunctionPointerType func;
@@ -641,6 +682,11 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_MY(glEGLImageTargetRenderbufferStorageOES),
 	OVERRIDE_MY(eglDestroyImageKHR),
 	OVERRIDE_MY(eglGetConfigAttrib),
+#ifdef WANT_MEMBRANE
+	OVERRIDE_MY(eglQueryDisplayAttribEXT),
+	OVERRIDE_MY(eglQueryDevicesEXT),
+	OVERRIDE_MY(eglQueryDeviceStringEXT),
+#endif
 	OVERRIDE_MY(eglQueryDmaBufFormatsEXT),
 	OVERRIDE_MY(eglQueryDmaBufModifiersEXT),
 	OVERRIDE_SAMENAME(eglGetError),
