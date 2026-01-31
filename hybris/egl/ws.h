@@ -58,6 +58,7 @@ struct ws_module {
 	void (*releaseDisplay)(struct _EGLDisplay *dpy);
 	void (*eglInitialized)(struct _EGLDisplay *dpy);
 
+	EGLBoolean (*eglGetConfigAttrib)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
 	EGLBoolean (*eglQueryDmaBufModifiersEXT)(EGLDisplay dpy, EGLint format, EGLint max_modifiers, EGLuint64KHR *modifiers, EGLBoolean *external_only, EGLint *num_modifiers);
 	EGLBoolean (*eglQueryDmaBufFormatsEXT)(EGLDisplay dpy, EGLint max_formats, EGLint *formats, EGLint *num_formats);
 };
@@ -77,6 +78,7 @@ void ws_finishSwap(EGLDisplay dpy, EGLNativeWindowType win);
 void ws_setSwapInterval(EGLDisplay dpy, EGLNativeWindowType win, EGLint interval);
 void ws_releaseDisplay(struct _EGLDisplay *dpy);
 
+EGLBoolean ws_GetConfigAttrib(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
 EGLBoolean ws_QueryDmaBufModifiersEXT(EGLDisplay dpy, EGLint format, EGLint max_modifiers, EGLuint64KHR *modifiers, EGLBoolean *external_only, EGLint *num_modifiers);
 EGLBoolean ws_QueryDmaBufFormatsEXT(EGLDisplay dpy, EGLint max_formats, EGLint *formats, EGLint *num_formats);
 

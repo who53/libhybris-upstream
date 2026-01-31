@@ -202,6 +202,13 @@ void ws_setSwapInterval(EGLDisplay dpy, EGLNativeWindowType win, EGLint interval
 		ws->setSwapInterval(dpy, win, interval);
 }
 
+EGLBoolean ws_GetConfigAttrib(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value)
+{
+	if (ws == NULL || !ws->eglGetConfigAttrib)
+		return EGL_FALSE;
+	return ws->eglGetConfigAttrib(dpy, config, attribute, value);
+}
+
 EGLBoolean ws_QueryDmaBufModifiersEXT(EGLDisplay dpy, EGLint format, EGLint max_modifiers, EGLuint64KHR *modifiers, EGLBoolean *external_only, EGLint *num_modifiers)
 {
 	if (ws == NULL || !ws->eglQueryDmaBufModifiersEXT)

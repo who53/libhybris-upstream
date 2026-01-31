@@ -329,7 +329,22 @@ const char * eglQueryString(EGLDisplay dpy, EGLint name)
 
 HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigs, EGLDisplay, EGLConfig *, EGLint, EGLint *);
 HYBRIS_IMPLEMENT_FUNCTION5(egl, EGLBoolean, eglChooseConfig, EGLDisplay, const EGLint *, EGLConfig *, EGLint, EGLint *);
-HYBRIS_IMPLEMENT_FUNCTION4(egl, EGLBoolean, eglGetConfigAttrib, EGLDisplay, EGLConfig, EGLint, EGLint *);
+
+static EGLBoolean (*_eglGetConfigAttrib)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value) = NULL;
+
+static EGLBoolean _my_eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value)
+{
+	if (ws_GetConfigAttrib(dpy, config, attribute, value) == EGL_TRUE)
+		return EGL_TRUE;
+
+	HYBRIS_DLSYSM(egl, &_eglGetConfigAttrib, "eglGetConfigAttrib");
+	return _eglGetConfigAttrib(dpy, config, attribute, value);
+}
+
+EGLBoolean eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value)
+{
+	return _my_eglGetConfigAttrib(dpy, config, attribute, value);
+}
 
 EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config,
 		EGLNativeWindowType win,
